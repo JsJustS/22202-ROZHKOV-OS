@@ -48,10 +48,6 @@ void main(int argc, char** argv) {
 		return;
 	}
 
-	/*if (access(argv[1], F_OK) != 0) {
-		printf("Error while accessing %s: %s\n", argv[1], strerror(errno));
-		return;
-	}*/
 	char* cmd[100];
 	trunkName(cmd, argv[0]);
 	switch(parseCommand(cmd)) {
