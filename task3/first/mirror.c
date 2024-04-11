@@ -55,9 +55,9 @@ void mirrorDir(const char* dirPath, const char* mirroredDirPath) {
 	}
 
 	// Заполняем оригинальный и отражённый пути
-	char filePath[100];
-	char mirroredFilePath[100];
 	int dirPathLen = strlen(dirPath);
+	char filePath[dirPathLen + 256];
+	char mirroredFilePath[dirPathLen + 256];
 	memcpy(filePath, dirPath, dirPathLen*sizeof(char));
 	memcpy(mirroredFilePath, mirroredDirPath, dirPathLen*sizeof(char));
 	filePath[dirPathLen] = '/';
