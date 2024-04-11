@@ -1,5 +1,6 @@
 #include <errno.h>
 #include <fcntl.h>
+#include <stdio.h>
 
 int readLine(int fd, char* buff, unsigned long long* offset);
 int nextAddress(int fd, char* buff, unsigned long long* offset);
@@ -35,7 +36,7 @@ int main(int argc, char** argv) {
 	
 	int pfd;
 	if ((pfd=open(path_p, O_RDONLY)) == -1) {
-		printf("Error while opening %s: %s\n", path_p, strerror(errno));
+		fprintf(stderr, "Error while opening %s: %s\n", path_p, strerror(errno));
 		return 1;
 	}
 
@@ -52,7 +53,7 @@ int main(int argc, char** argv) {
 	int mfd;
 	if ((mfd=open(path_m, O_RDONLY)) == -1) {
 		close(pfd);
-		printf("Error while opening %s: %s\n", path_m, strerror(errno));
+		fprintf(stderr, "Error while opening %s: %s\n", path_m, strerror(errno));
 		return 1;
 	}
 
@@ -81,13 +82,13 @@ void printPageMapping(int fd, unsigned long long vaddr) {
 	printf("%llu\t", offset);
 
 	if (lseek(fd, offset, SEEK_SET)==-1) {
-		printf("\nError while offsetting for %llu bytes: %s\n", vaddr, strerror(errno));
+		fprintf(stderr, "\nError while offsetting for %llu bytes: %s\n", vaddr, strerror(errno));
 		return;
 	}
 	
 	unsigned char buff[PAGE_ENTRY];
 	if (read(fd, buff, PAGE_ENTRY) == -1) {
-		printf("\nError while reading 0x%llx: %s\n", vaddr, strerror(errno));
+		fprintf(stderr, "\nError while reading 0x%llx: %s\n", vaddr, strerror(errno));
 		return;
 	}
 
