@@ -4,6 +4,7 @@
 #include <sys/stat.h>
 #include <sys/types.h>
 #include <fcntl.h>
+#include <stdio.h>
 
 #define BUFSIZE 1024
 #define DIR_ENT struct dirent
@@ -11,22 +12,12 @@
 
 typedef enum Command {
 	UNKNOWN_CMD,
-	CREATE,
+	CREATE, // -f = file, -d = dir, -h <...> = hardlink, -s <...> = symlink
 	CAT, // -p = permissions, -h = hardlinks count, 
 	REMOVE,
 	PERM
 	
 } Command;
-
-typedef enum Argument {
-	UNKNOWN_ARG,
-	HELP,
-	FILE,
-	DIR_ARG,
-	SYMLINK,
-	HARDLINK,
-	PERMISSION
-} Argument;
 
 void trunkName(char* name, const char* path);
 
@@ -39,15 +30,13 @@ int cmdCreate(int argc, char** argv);
 int cmdCat(int argc, char** argv);
 int cmdRemove(int argc, char** argv);
 int cmdPermission(int argc, char** argv);
-
-Argument parseArgument(char* arg);
+void printHelp(char* path);
 
 void main(int argc, char** argv) {
 	if (argc < 2) {
 		printf("Use: %s /path/to/file [flags...]\n", argv[0]);
 		return;
 	}
-
 	char* cmd[100];
 	trunkName(cmd, argv[0]);
 	switch(parseCommand(cmd)) {
@@ -69,16 +58,6 @@ Command parseCommand(char* str) {
 	if (strcmp(str, "remove")==0) return REMOVE;
 	if (strcmp(str, "permission")==0) return PERM;
 	return UNKNOWN_CMD;
-}
-
-Argument parseArgument(char* arg) {
-	if (strcmp(arg, "-help")==0) return HELP;
-	if (strcmp(arg, "-f")==0) return FILE;
-	if (strcmp(arg, "-d")==0) return DIR_ARG;
-	if (strcmp(arg, "-s")==0) return SYMLINK;
-	if (strcmp(arg, "-h")==0) return HARDLINK;
-	if (strcmp(arg, "-p")==0) return PERMISSION;
-	return UNKNOWN_ARG;
 }
 
 void trunkName(char* name, const char* path) {
@@ -123,65 +102,61 @@ int isLink(const char* path) {
 }
 
 int cmdCreate(int argc, char** argv) {
-	if (parseArgument(argv[1]) == HELP || argc < 3) {
-		printf("Use: %s /path/to/file -flag <linkpath>\n", argv[0]);
-		puts("\t-d\tcreates directory with specified path");
-		puts("\t-f\tcreates file with specified path (all permissions granted)");
-		puts("\t-s\tcreates symlink in current directory for specified path");
-		puts("\t\tYou can specify second path where symlink will be put");
-		puts("\t-h\tcreates hardlink in current directory for specified path");
-		puts("\t\tYou can specify second path where hardlink will be put");
+	if (argc < 3) {
+		printHelp(argv[0]);
 		return 0;
 	}
-	switch (parseArgument(argv[2])) {
-		case DIR_ARG: {
-			if (mkdir(argv[1], ALL_PERMS) != 0) {
-				printf("Error while creating dir %s: %s\n", argv[1], strerror(errno));
+
+	int rez = 0;
+	char* path = argv[1];
+	while ((rez = getopt(argc, argv, "fdh::s::")) != -1){
+		switch (rez) {
+		case 'f': {
+				int fd = open(path, O_CREAT | O_RDWR | O_TRUNC, ALL_PERMS);
+    				if (fd == -1) {	
+					fprintf(stderr, "Error while creating file %s: %s\n", path, strerror(errno));
+					return 1;
+    				} else {
+					close(fd);
+				}
+				break;
+			}
+		case 'd': {
+				if (mkdir(path, ALL_PERMS) != 0) {
+					fprintf(stderr, "Error while creating dir %s: %s\n", path, strerror(errno));
+					return 1;
+				}
+				break;
+			}
+		case 'h': {
+				char* linkpath = (optarg == NULL)?".":optarg;
+				if (link(path, linkpath) == -1) {
+					fprintf(stderr, "Error while creating hardlink \"%s\" for file \"%s\": %s\n", linkpath, path, strerror(errno));
+					return 1;
+    				}
+				break;
+			}
+		case 's': {
+				char* linkpath = (optarg == NULL)?".":optarg;
+				if (symlink(path, linkpath) == -1) {
+					fprintf(stderr, "Error while creating hardlink \"%s\" for file \"%s\": %s\n", linkpath, path, strerror(errno));
+					return 1;
+    				}
+				break;
+			}
+		case '?': {
+				fprintf(stderr, "Could not parse arguments for \"%s\"\n", path);
+				printHelp(argv[0]);
 				return 1;
 			}
-			break;
-		}
-		case FILE: {
-			int fd = open(argv[1], O_CREAT | O_RDWR | O_TRUNC, ALL_PERMS);
-    			if (fd == -1) {	
-				printf("Error while creating file %s: %s\n", argv[1], strerror(errno));
-				return 1;
-    			} else {
-				close(fd);
-			}
-			break;
-		}
-		case SYMLINK: {
-			char* linkpath = (argc<4)?".":argv[3];
-			if (symlink(argv[1], linkpath) == -1) {
-				printf("Error while creating hardlink \"%s\" for file \"%s\": %s\n", linkpath, argv[1], strerror(errno));
-				return 1;
-    			}
-			break;
-		}
-		case HARDLINK: {
-			char* linkpath = (argc<4)?".":argv[3];
-			if (link(argv[1], linkpath) == -1) {
-				printf("Error while creating hardlink \"%s\" for file \"%s\": %s\n", linkpath, argv[1], strerror(errno));
-				return 1;
-    			}
-			break;
-		}
-		default: {
-			printf("Could not parse arguments for \"%s\"\n", argv[1]);
-			return 1;
 		}
 	}
 	return 0;
 }
 
 int cmdCat(int argc, char** argv) {
-	if (parseArgument(argv[1]) == HELP || argc < 2 || argc > 3) {
-		printf("Use: %s /path/to/file <-flag>\n", argv[0]);
-		puts("\t\twithout flags prints data inside");
-		puts("\t-s\tprints data inside symlink");		
-		puts("\t-p\tprints file permissions");
-		puts("\t-h\tprints hardlink count");
+	if (argc < 2) {
+		printHelp(argv[0]);
 		return 0;
 	}
 
@@ -230,76 +205,82 @@ int cmdCat(int argc, char** argv) {
 		puts("Specified file is not supported");
 		return 1;
 	} else {
-		switch(parseArgument(argv[2])) {
-			case SYMLINK: {
-				char buff[BUFSIZE];
-				int len = readlink(argv[1], buff, BUFSIZE-1);
-				if (len == -1) {
-					printf("Could not read symlink %s: %s\n", argv[1], strerror(errno));
+		int rez = 0;
+		char* path = argv[1];
+		while ((rez = getopt(argc, argv, "hsp")) != -1) {
+			switch(rez) {
+			case 's': {
+					char buff[BUFSIZE];
+					int len = readlink(path, buff, BUFSIZE-1);
+					if (len == -1) {
+						fprintf(stderr, "Could not read symlink %s: %s\n", path, strerror(errno));
+						return 1;
+					}
+					buff[len] = '\0';
+					printf("Symlink \"%s\" contains: %s\n", path, buff);
+					break;
+				}
+			case 'p': {
+					struct stat fileStat;
+					if (stat(path, &fileStat) != 0) {
+						fprintf(stderr, "Could not read stat data for %s: %s\n", path, strerror(errno));
+						return 1;
+					}
+					printf("File permissions for \"%s\": ", path);
+					printf((S_ISDIR(fileStat.st_mode)) ? "d" : "-"); // Проверяем, является ли файл директорией
+					printf((fileStat.st_mode & S_IRUSR) ? "r" : "-");
+					printf((fileStat.st_mode & S_IWUSR) ? "w" : "-");
+					printf((fileStat.st_mode & S_IXUSR) ? "x" : "-");
+					printf((fileStat.st_mode & S_IRGRP) ? "r" : "-");
+					printf((fileStat.st_mode & S_IWGRP) ? "w" : "-");
+					printf((fileStat.st_mode & S_IXGRP) ? "x" : "-");
+					printf((fileStat.st_mode & S_IROTH) ? "r" : "-");
+					printf((fileStat.st_mode & S_IWOTH) ? "w" : "-");
+					printf((fileStat.st_mode & S_IXOTH) ? "x" : "-");
+					printf("\n");
+					break;
+				}
+			case 'h': {
+					struct stat fileStat;
+					if (stat(path, &fileStat) != 0) {
+						fprintf(stderr, "Could not read stat data for %s: %s\n", path, strerror(errno));
+						return 1;
+					}
+					printf("Hardlinks count for \"%s\": %d\n", path, fileStat.st_nlink);
+					break;
+				}
+			case '?': {
+					fprintf(stderr, "Wrong argument passed: \"%s\"\n", argv[optind]);
 					return 1;
 				}
-				buff[len] = '\0';
-				printf("Symlink \"%s\" contains: %s\n", argv[1], buff);
-				return 0;
-			}
-			case PERMISSION: {
-				struct stat fileStat;
-				if (stat(argv[1], &fileStat) != 0) {
-					printf("Could not read stat data for %s: %s\n", argv[1], strerror(errno));
-					return 1;
-				}
-				printf("File permissions for \"%s\": ", argv[1]);
-				printf((S_ISDIR(fileStat.st_mode)) ? "d" : "-"); // Проверяем, является ли файл директорией
-				printf((fileStat.st_mode & S_IRUSR) ? "r" : "-");
-				printf((fileStat.st_mode & S_IWUSR) ? "w" : "-");
-				printf((fileStat.st_mode & S_IXUSR) ? "x" : "-");
-				printf((fileStat.st_mode & S_IRGRP) ? "r" : "-");
-				printf((fileStat.st_mode & S_IWGRP) ? "w" : "-");
-				printf((fileStat.st_mode & S_IXGRP) ? "x" : "-");
-				printf((fileStat.st_mode & S_IROTH) ? "r" : "-");
-				printf((fileStat.st_mode & S_IWOTH) ? "w" : "-");
-				printf((fileStat.st_mode & S_IXOTH) ? "x" : "-");
-				printf("\n");
-				return 0;
-			}
-			case HARDLINK: {
-				struct stat fileStat;
-				if (stat(argv[1], &fileStat) != 0) {
-					printf("Could not read stat data for %s: %s\n", argv[1], strerror(errno));
-					return 1;
-				}
-				printf("Hardlinks count for \"%s\": %d\n", argv[1], fileStat.st_nlink);
-				return 0;
 			}
 		}
-		printf("Wrong argument passed: \"%s\"\n", argv[2]);
+		return 0;
 	}
 	return 1;
 }
 
 int cmdRemove(int argc, char** argv) {
-	if (parseArgument(argv[1]) == HELP || argc != 2) {
-		printf("Use: %s /path/to/file\n", argv[0]);
-		puts("\t\t deletes entity specified in path");
-		puts("\t\t if entity is a symlink - only this link will be deleted, original files won't change");
+	if (argc != 2) {
+		printHelp(argv[0]);
 		return 0;
 	}
 
 	if (isLink(argv[1])) {
 		if (unlink(argv[1])!=0) {
-			printf("Error while removing symlink %s: %s\n", argv[1], strerror(errno));
+			fprintf(stderr, "Error while removing symlink %s: %s\n", argv[1], strerror(errno));
 			return 1;
 		}
 	}
 	else if (isFile(argv[1])) {
 		if (remove(argv[1])!=0) {
-			printf("Error while removing file %s: %s\n", argv[1], strerror(errno));
+			fprintf(stderr, "Error while removing file %s: %s\n", argv[1], strerror(errno));
 			return 1;
 		}
 	}
 	else if (isDir(argv[1])) {
 		if (rmdir(argv[1])!=0) {
-			printf("Error while removing dir %s: %s\n", argv[1], strerror(errno));
+			fprintf(stderr, "Error while removing dir %s: %s\n", argv[1], strerror(errno));
 			return 1;
 		}
 	}
@@ -307,9 +288,8 @@ int cmdRemove(int argc, char** argv) {
 }
 
 int cmdPermission(int argc, char** argv) {
-	if (parseArgument(argv[1]) == HELP || argc != 3 || strlen(argv[2]) != 9) {
-		printf("Use: %s /path/to/file p-e-r-m-s\n", argv[0]);
-		puts("\t\t changes file's permissions to the ones provided by user");
+	if (argc != 3 || strlen(argv[2]) != 9) {
+		printHelp(argv[0]);
 		return 0;
 	}
 
@@ -342,14 +322,51 @@ int cmdPermission(int argc, char** argv) {
 				perms |= S_IXOTH;
 			}
 		} else if (argv[2][i] != '-') {
-			printf("Invalid permission character: %c\n", argv[2][i]);
+			fprintf(stderr, "Invalid permission character: %c\n", argv[2][i]);
             		return 1;
 		}
 	}
 
 	if (chmod(argv[1], perms) == -1) {
-        	printf("Could not change permissions for %s: %s\n", argv[1], strerror(errno));
+        	fprintf(stderr, "Could not change permissions for %s: %s\n", argv[1], strerror(errno));
         	return 1;
     	}
 	return 0;
+}
+
+void printHelp(char* path) {
+	char cmd[100];
+	trunkName(cmd, path);
+	switch (parseCommand(cmd)) {
+		case CREATE: {
+			printf("Use: %s /path/to/file -flag <linkpath>\n", path);
+			puts("\t-d\tcreates directory with specified path");
+			puts("\t-f\tcreates file with specified path (all permissions granted)");
+			puts("\t-s\tcreates symlink in current directory for specified path");
+			puts("\t\tYou can specify second path where symlink will be put");
+			puts("\t-h\tcreates hardlink in current directory for specified path");
+			puts("\t\tYou can specify second path where hardlink will be put");
+			return;
+		}
+		case CAT: {
+			printf("Use: %s /path/to/file <-flag>\n", path);
+			puts("\t\twithout flags prints data inside");
+			puts("\t-s\tprints data inside symlink");		
+			puts("\t-p\tprints file permissions");
+			puts("\t-h\tprints hardlink count");
+			return;
+		}
+		case REMOVE: {
+			printf("Use: %s /path/to/file\n", path);
+			puts("\t\t deletes entity specified in path");
+			puts("\t\t if entity is a symlink - only this link will be deleted, original files won't change");
+			return;
+		}
+		case PERM: {
+			printf("Use: %s /path/to/file p-e-r-m-s\n", path);
+			puts("\t\t changes file's permissions to the ones provided by user");
+			return;
+		}
+		default: fprintf(stderr, "Unknown command: %s\n", path);
+	}
 }
