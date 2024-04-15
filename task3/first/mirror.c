@@ -8,6 +8,7 @@
 
 #define DIR_ENT struct dirent
 #define ALL_PERMS S_IRWXU | S_IRWXO | S_IRWXG
+#define BUFSIZE 1024
 
 void mirrorFile(const char* src, const char* dst);
 void mirrorDir(const char* dirPath, const char* mirroredDirPath);
@@ -64,25 +65,26 @@ void mirrorDir(const char* dirPath, const char* mirroredDirPath) {
 	mirroredFilePath[dirPathLen] = '/';
 	// Обходим оригинальную папку и копируем файлы
 	while ((dirEntry = readdir(dirDesc)) != NULL) {
-        	if (dirEntry->d_type == DT_REG || dirEntry->d_type == DT_DIR) {
-			// Скипаем temp файлы, их всё равно не видно в обычном режиме
-			int nameLen = strlen(dirEntry->d_name);
-			if (dirEntry->d_name[nameLen-1] == '~' || strcmp(dirEntry->d_name, ".") == 0 || strcmp(dirEntry->d_name, "..") == 0) {
-				continue;
-			}
-			char* mirroredFileName[strlen(dirEntry->d_name)+1];
-			mirrorFilename(dirEntry->d_name, mirroredFileName);
-			memcpy(filePath+dirPathLen+1, dirEntry->d_name, nameLen*sizeof(char));
-			memcpy(mirroredFilePath+dirPathLen+1, mirroredFileName, nameLen*sizeof(char));
-			filePath[dirPathLen+1+nameLen] = '\0';
-			mirroredFilePath[dirPathLen+1+nameLen] = '\0';
-			// debug: printf("==\n%s\n--\n%s\n", filePath, mirroredFilePath);
-			// На этом этапе имеем оригинальный путь к файлу и отражённый путь к файлу
-			if (dirEntry->d_type == DT_REG) {
-				mirrorFile(filePath, mirroredFilePath);
-			} else {
-				mirrorDir(filePath, mirroredFilePath);
-			}
+        	if (dirEntry->d_type != DT_REG && dirEntry->d_type != DT_DIR) {continue;}
+
+		// Скипаем temp файлы, их всё равно не видно в обычном режиме
+		int nameLen = strlen(dirEntry->d_name);
+		if (dirEntry->d_name[nameLen-1] == '~' || strcmp(dirEntry->d_name, ".") == 0 || strcmp(dirEntry->d_name, "..") == 0) {
+			continue;
+		}
+
+		char* mirroredFileName[strlen(dirEntry->d_name)+1];
+		mirrorFilename(dirEntry->d_name, mirroredFileName);
+		memcpy(filePath+dirPathLen+1, dirEntry->d_name, nameLen*sizeof(char));
+		memcpy(mirroredFilePath+dirPathLen+1, mirroredFileName, nameLen*sizeof(char));
+		filePath[dirPathLen+1+nameLen] = '\0';
+		mirroredFilePath[dirPathLen+1+nameLen] = '\0';
+
+		// На этом этапе имеем оригинальный путь к файлу и отражённый путь к файлу
+		if (dirEntry->d_type == DT_REG) {
+			mirrorFile(filePath, mirroredFilePath);
+		} else {
+			mirrorDir(filePath, mirroredFilePath);
 		}
 	}
 
@@ -92,8 +94,6 @@ void mirrorDir(const char* dirPath, const char* mirroredDirPath) {
 void mirrorFilename(const char* filepath, char* mirrored) {
 	int len = strlen(filepath);
 	mirrored[len] = '\0';
-
-	// debug: printf("Path: %s\n", filepath);
 
 	// Находим индекс начала имени файла в пути
 	int i, j, k;
@@ -111,22 +111,17 @@ void mirrorFilename(const char* filepath, char* mirrored) {
 		memcpy(mirrored, filepath, (i+1)*sizeof(char));
 	}
 
-	// debug: printf("After first if copy: %s\n", mirrored);
 	if (j != -1) {
 		memcpy(mirrored+j, filepath+j, (len-j)*sizeof(char));
 	} else {
 		j = len;
 	}
 
-	// debug: printf("After second if copy: %s\n", mirrored);
 	for (k = 1; i + k < j ; ++k) {
 		mirrored[i + k] = filepath[j - k];
 	}
-
-	// debug: printf("After mirroring: %s\n", mirrored);
 }
 
-#define BUFSIZE 1024
 void mirrorFile(const char* src, const char* dst) {
 	if (src == NULL || dst == NULL) {
 		fprintf(stderr, "Bad path provided\n");
@@ -174,8 +169,6 @@ void mirrorFile(const char* src, const char* dst) {
 		if (lseek(srcDesc, (srcSize > BUFSIZE ? -BUFSIZE : -srcSize) - count, SEEK_END) != 0) {
 			close(srcDesc);
 			close(dstDesc);
-			//free(buff);
-			//free(mirrorBuff);
 			fprintf(stderr, "Could not set cursor for %s: %s\n", src, strerror(errno));
 			return;
 		}
