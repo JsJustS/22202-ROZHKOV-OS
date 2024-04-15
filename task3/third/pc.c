@@ -1,6 +1,8 @@
 #include <errno.h>
 #include <fcntl.h>
-#include <stdio.h>
+
+#define PAGE_ENTRY 8
+#define SIZE 100
 
 int readLine(int fd, char* buff, unsigned long long* offset);
 int nextAddress(int fd, char* buff, unsigned long long* offset);
@@ -29,14 +31,14 @@ int main(int argc, char** argv) {
 	}
 
 	// Парсим путь pagemap
-	char path_p[100];
+	char path_p[SIZE];
 	sprintf(path_p, "/proc/%s/pagemap", argv[1]);
 	printf("Printing data from \"%s\":\n", path_p);
 	printf("VADDR\t\tOFFSET\t\tPGDATA\t\tPFN\n");
 	
 	int pfd;
 	if ((pfd=open(path_p, O_RDONLY)) == -1) {
-		fprintf(stderr, "Error while opening %s: %s\n", path_p, strerror(errno));
+		printf("Error while opening %s: %s\n", path_p, strerror(errno));
 		return 1;
 	}
 
@@ -48,12 +50,12 @@ int main(int argc, char** argv) {
 	}
 
 	// Иначе парсим /proc/pid/maps
-	char path_m[100];
+	char path_m[SIZE];
 	sprintf(path_m, "/proc/%s/maps", argv[1]);
 	int mfd;
 	if ((mfd=open(path_m, O_RDONLY)) == -1) {
 		close(pfd);
-		fprintf(stderr, "Error while opening %s: %s\n", path_m, strerror(errno));
+		printf("Error while opening %s: %s\n", path_m, strerror(errno));
 		return 1;
 	}
 
@@ -73,7 +75,6 @@ int main(int argc, char** argv) {
 	return 0;
 }
 
-#define PAGE_ENTRY 8
 void printPageMapping(int fd, unsigned long long vaddr) {
 	printf("0x%llx\t", vaddr);
 
@@ -82,13 +83,13 @@ void printPageMapping(int fd, unsigned long long vaddr) {
 	printf("%llu\t", offset);
 
 	if (lseek(fd, offset, SEEK_SET)==-1) {
-		fprintf(stderr, "\nError while offsetting for %llu bytes: %s\n", vaddr, strerror(errno));
+		printf("\nError while offsetting for %llu bytes: %s\n", vaddr, strerror(errno));
 		return;
 	}
 	
 	unsigned char buff[PAGE_ENTRY];
 	if (read(fd, buff, PAGE_ENTRY) == -1) {
-		fprintf(stderr, "\nError while reading 0x%llx: %s\n", vaddr, strerror(errno));
+		printf("\nError while reading 0x%llx: %s\n", vaddr, strerror(errno));
 		return;
 	}
 
@@ -113,7 +114,6 @@ unsigned long long addressToLL(char* address) {
 	return value;
 }
 
-#define SIZE 100
 int nextAddress(int fd, char* buff, unsigned long long* offset) {
 	char line[SIZE];
 	if (readLine(fd, line, offset) < 8) {
