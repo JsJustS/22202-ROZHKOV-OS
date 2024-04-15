@@ -6,7 +6,7 @@
 #include <fcntl.h>
 #include <stdio.h>
 
-#define BUFSIZE 1024
+#define BUFSIZE 4096
 #define DIR_ENT struct dirent
 #define ALL_PERMS S_IRWXU | S_IRWXO | S_IRWXG
 
@@ -20,10 +20,6 @@ typedef enum Command {
 } Command;
 
 void trunkName(char* name, const char* path);
-
-int isDir(const char* path);
-int isFile(const char* path);
-int isLink(const char* path);
 
 Command parseCommand(char* str);
 int cmdCreate(int argc, char** argv);
@@ -72,33 +68,6 @@ void trunkName(char* name, const char* path) {
 	}
 	// вставляем
 	memcpy(name, path+i+1, (len-i)*sizeof(char));
-}
-
-int isDir(const char* path) {
-	struct stat fileStat;
-	if (lstat(path, &fileStat) != 0) {
-		printf("Could not read stat data for %s: %s\n", path, strerror(errno));
-		return 0;
-	}
-	return S_ISDIR(fileStat.st_mode);
-}
-
-int isFile(const char* path) {
-	struct stat fileStat;
-	if (lstat(path, &fileStat) != 0) {
-		printf("Could not read stat data for %s: %s\n", path, strerror(errno));
-		return 0;
-	}
-	return S_ISREG(fileStat.st_mode);
-}
-
-int isLink(const char* path) {
-	struct stat fileStat;
-	if (lstat(path, &fileStat) != 0) {
-		printf("Could not read stat data for %s: %s\n", path, strerror(errno));
-		return 0;
-	}
-	return S_ISLNK(fileStat.st_mode);
 }
 
 int cmdCreate(int argc, char** argv) {
@@ -204,60 +173,59 @@ int cmdCat(int argc, char** argv) {
 		}
 		puts("Specified file is not supported");
 		return 1;
-	} else {
-		int rez = 0;
-		char* path = argv[1];
-		while ((rez = getopt(argc, argv, "hsp")) != -1) {
-			switch(rez) {
-			case 's': {
-					char buff[BUFSIZE];
-					int len = readlink(path, buff, BUFSIZE-1);
-					if (len == -1) {
-						fprintf(stderr, "Could not read symlink %s: %s\n", path, strerror(errno));
-						return 1;
-					}
-					buff[len] = '\0';
-					printf("Symlink \"%s\" contains: %s\n", path, buff);
-					break;
-				}
-			case 'p': {
-					struct stat fileStat;
-					if (stat(path, &fileStat) != 0) {
-						fprintf(stderr, "Could not read stat data for %s: %s\n", path, strerror(errno));
-						return 1;
-					}
-					printf("File permissions for \"%s\": ", path);
-					printf((S_ISDIR(fileStat.st_mode)) ? "d" : "-"); // Проверяем, является ли файл директорией
-					printf((fileStat.st_mode & S_IRUSR) ? "r" : "-");
-					printf((fileStat.st_mode & S_IWUSR) ? "w" : "-");
-					printf((fileStat.st_mode & S_IXUSR) ? "x" : "-");
-					printf((fileStat.st_mode & S_IRGRP) ? "r" : "-");
-					printf((fileStat.st_mode & S_IWGRP) ? "w" : "-");
-					printf((fileStat.st_mode & S_IXGRP) ? "x" : "-");
-					printf((fileStat.st_mode & S_IROTH) ? "r" : "-");
-					printf((fileStat.st_mode & S_IWOTH) ? "w" : "-");
-					printf((fileStat.st_mode & S_IXOTH) ? "x" : "-");
-					printf("\n");
-					break;
-				}
-			case 'h': {
-					struct stat fileStat;
-					if (stat(path, &fileStat) != 0) {
-						fprintf(stderr, "Could not read stat data for %s: %s\n", path, strerror(errno));
-						return 1;
-					}
-					printf("Hardlinks count for \"%s\": %d\n", path, fileStat.st_nlink);
-					break;
-				}
-			case '?': {
-					fprintf(stderr, "Wrong argument passed: \"%s\"\n", argv[optind]);
+	}
+	// argc == 3	
+	int rez = 0;
+	char* path = argv[1];
+	while ((rez = getopt(argc, argv, "hsp")) != -1) {
+		switch(rez) {
+		case 's': {
+				char buff[BUFSIZE];
+				int len = readlink(path, buff, BUFSIZE-1);
+				if (len == -1) {
+					fprintf(stderr, "Could not read symlink %s: %s\n", path, strerror(errno));
 					return 1;
 				}
+				buff[len] = '\0';
+				printf("Symlink \"%s\" contains: %s\n", path, buff);
+				break;
+			}
+		case 'p': {
+				struct stat fileStat;
+				if (stat(path, &fileStat) != 0) {
+					fprintf(stderr, "Could not read stat data for %s: %s\n", path, strerror(errno));
+					return 1;
+				}
+				printf("File permissions for \"%s\": ", path);
+				printf((S_ISDIR(fileStat.st_mode)) ? "d" : "-"); // Проверяем, является ли файл директорией
+				printf((fileStat.st_mode & S_IRUSR) ? "r" : "-");
+				printf((fileStat.st_mode & S_IWUSR) ? "w" : "-");
+				printf((fileStat.st_mode & S_IXUSR) ? "x" : "-");
+				printf((fileStat.st_mode & S_IRGRP) ? "r" : "-");
+				printf((fileStat.st_mode & S_IWGRP) ? "w" : "-");
+				printf((fileStat.st_mode & S_IXGRP) ? "x" : "-");
+				printf((fileStat.st_mode & S_IROTH) ? "r" : "-");
+				printf((fileStat.st_mode & S_IWOTH) ? "w" : "-");
+				printf((fileStat.st_mode & S_IXOTH) ? "x" : "-");
+				printf("\n");
+				break;
+			}
+		case 'h': {
+				struct stat fileStat;
+				if (stat(path, &fileStat) != 0) {
+						fprintf(stderr, "Could not read stat data for %s: %s\n", path, strerror(errno));
+					return 1;
+				}
+				printf("Hardlinks count for \"%s\": %d\n", path, fileStat.st_nlink);
+				break;
+			}
+		case '?': {
+				fprintf(stderr, "Wrong argument passed: \"%s\"\n", argv[optind]);
+				return 1;
 			}
 		}
-		return 0;
 	}
-	return 1;
+	return 0;
 }
 
 int cmdRemove(int argc, char** argv) {
@@ -266,19 +234,25 @@ int cmdRemove(int argc, char** argv) {
 		return 0;
 	}
 
-	if (isLink(argv[1])) {
+	struct stat fileStat;
+	if (lstat(argv[1], &fileStat) != 0) {
+		printf("Could not read stat data for %s: %s\n", argv[1], strerror(errno));
+		return 0;
+	}
+
+	if (S_ISLNK(fileStat.st_mode)) {
 		if (unlink(argv[1])!=0) {
 			fprintf(stderr, "Error while removing symlink %s: %s\n", argv[1], strerror(errno));
 			return 1;
 		}
 	}
-	else if (isFile(argv[1])) {
+	else if (S_ISREG(fileStat.st_mode)) {
 		if (remove(argv[1])!=0) {
 			fprintf(stderr, "Error while removing file %s: %s\n", argv[1], strerror(errno));
 			return 1;
 		}
 	}
-	else if (isDir(argv[1])) {
+	else if (S_ISDIR(fileStat.st_mode)) {
 		if (rmdir(argv[1])!=0) {
 			fprintf(stderr, "Error while removing dir %s: %s\n", argv[1], strerror(errno));
 			return 1;
