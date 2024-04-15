@@ -98,7 +98,7 @@ int cmdCreate(int argc, char** argv) {
 				break;
 			}
 		case 'h': {
-				char* linkpath = (optarg == NULL)?".":optarg;
+				char* linkpath = (optarg == NULL)?"./hardlink":optarg;
 				if (link(path, linkpath) == -1) {
 					fprintf(stderr, "Error while creating hardlink \"%s\" for file \"%s\": %s\n", linkpath, path, strerror(errno));
 					return 1;
@@ -106,9 +106,9 @@ int cmdCreate(int argc, char** argv) {
 				break;
 			}
 		case 's': {
-				char* linkpath = (optarg == NULL)?".":optarg;
+				char* linkpath = (optarg == NULL)?"./symlink":optarg;
 				if (symlink(path, linkpath) == -1) {
-					fprintf(stderr, "Error while creating hardlink \"%s\" for file \"%s\": %s\n", linkpath, path, strerror(errno));
+					fprintf(stderr, "Error while creating symlink \"%s\" for file \"%s\": %s\n", linkpath, path, strerror(errno));
 					return 1;
     				}
 				break;
@@ -136,7 +136,7 @@ int cmdCat(int argc, char** argv) {
 			printf("Could not read stat data for %s: %s\n", argv[1], strerror(errno));
 			return 1;
 		}
-		if (S_ISREG(fileStat.st_mode)) {
+		if (S_ISREG(fileStat.st_mode) || S_ISLNK(fileStat.st_mode)) {
 			// cat
 			int fd = open(argv[1], O_RDONLY);
 			if (fd == -1) {
