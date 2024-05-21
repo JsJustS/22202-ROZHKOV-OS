@@ -45,7 +45,7 @@ void main(int argc, char** argv) {
 		} else {
 			printf("Message FROM server: \"%s\"\n", data);
 		}
-		if (strcmp(data, "exit")==0 || strcmp(data, "close")==0) {
+		if (strcmp(data, "exit")==0) {
 			close(clt_sock);
 			exit(0);
 		}
