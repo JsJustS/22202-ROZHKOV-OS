@@ -5,12 +5,16 @@
 #include <netinet/in.h>
 #include <sys/wait.h>
 #define sockaddr struct sockaddr_in
-#define PORT 8888
-void main() {
-	int clt_sock;
-	sockaddr srv_sockaddr;
 
-	clt_sock = socket(AF_INET, SOCK_DGRAM, 0);
+void main(int argc, char** argv) {
+	int PORT = 8888;
+	if (argc > 1) {
+		PORT = atoi(argv[1]);
+	}
+	int clt_sock;
+	sockaddr clt_sockaddr, srv_sockaddr;
+
+	clt_sock = socket(AF_INET, SOCK_STREAM, 0);
 	if (clt_sock == -1) {
 		perror("Could not open socket");
 		exit(1);
@@ -22,13 +26,20 @@ void main() {
 	srv_sockaddr.sin_addr.s_addr = htonl(INADDR_ANY);
     	srv_sockaddr.sin_port = htons(PORT);
 
+	int err = connect(clt_sock, (sockaddr*) &srv_sockaddr, sizeof(srv_sockaddr));
+	if (err == -1) {
+		perror("Connection failed");
+		close(clt_sock);
+		exit(1);
+	}
+
 	char data[4096];
 	while (1) {
-		int ret, len;
+		int ret;
 		fgets(data, 4096, stdin);
 		data[strlen(data)-1] = '\0';
-		sendto(clt_sock, data, sizeof(data), 0, (sockaddr*) &srv_sockaddr, sizeof(srv_sockaddr));
-		ret = recvfrom(clt_sock, data, sizeof(data), 0, (sockaddr*) &srv_sockaddr, &len);
+		write(clt_sock, data, strlen(data));
+		ret = read(clt_sock, data, sizeof(data));
 		if (ret == -1) {
 			printf("Failed reading...\n");
 		} else {
