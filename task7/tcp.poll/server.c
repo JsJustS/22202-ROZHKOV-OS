@@ -37,7 +37,12 @@ void main() {
 	}
 
 	int option = 1;
-	setsockopt(srv_sock, SOL_SOCKET, SO_REUSEADDR, &option, sizeof(option));
+	err = setsockopt(srv_sock, SOL_SOCKET, SO_REUSEADDR, &option, sizeof(option));
+	if (err == -1) {
+		perror("Could not set socket option");
+		close(srv_sock);
+		return;
+	}
 
 	memset(&srv_sockaddr, 0, sizeof(sockaddr));
 	srv_sockaddr.sin_family = AF_INET;
@@ -127,7 +132,10 @@ int serveClient(int clt_sock) {
 	ret = read(clt_sock, data, sizeof(data));
 	if (ret < 1) return 1;
 	data[ret] = '\0';
-	write(clt_sock, data, ret);
+	if (write(clt_sock, data, ret) < 1) {
+		perror("Could not write to client");
+		return 1;
+	}
 	puts(data);
 	if (strcmp(data, "exit")==0) {
 		return 1;
