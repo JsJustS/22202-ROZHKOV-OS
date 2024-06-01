@@ -25,7 +25,6 @@ void main() {
 	}
 
 	sockaddr srv_sockaddr;
-	sockaddr clt_sockaddrs[MAX_CLIENTS];
 	int len = 0;
 	int val = 0;
 	int err;
@@ -115,7 +114,6 @@ void main() {
 				if (clt_socks[i] == -1) break;
 			}
 			clt_socks[i] = clt_sock;
-			clt_sockaddrs[i] = clt_sockaddr;
 			int clt_pid = fork();			
 			if (clt_pid == 0) {
 				int exitcode = serveClient(clt_sock);
