@@ -87,12 +87,16 @@ void main() {
 			sockaddr clt_sockaddr;
 			memset(&clt_sockaddr, 0, sizeof(sockaddr));
 			int clt_sock = accept4(srv_sock, (sockaddr*) &clt_sockaddr, &len, O_NONBLOCK);
+
+			// Не смогли установить новое соединение
 			if (clt_sock == -1) {
 				if (errno == EWOULDBLOCK) {
+					// Просто новых клиентов нет
         				puts("...");
         				sleep(1);
 					continue;
       				}
+				// Иначе произошла какая-то ошибка
 				perror("Could not accept client");
 				close(srv_sock);
 				for (i = 0; i < MAX_CLIENTS; ++i) {
@@ -104,7 +108,7 @@ void main() {
 				}
 				return;
 			}
-			
+			// Новый клиент подключился
 			client_count++;
 			printf("Client connected: %d/%d.\n", client_count, MAX_CLIENTS);
 			for (i = 0; i < MAX_CLIENTS; ++i) {
@@ -141,9 +145,16 @@ int serveClient(int clt_sock) {
 		int ret;
 		ret = read(clt_sock, data, sizeof(data));
 		if (ret == -1) continue;
-		if (ret == 0) break;
+		if (ret == 0) {
+			printf("Client %d died.\n", getpid());
+			break;
+		}
 		data[ret] = '\0';
-		write(clt_sock, data, ret);
+		if (write(clt_sock, data, ret) < 1) {
+			perror("Could not write data to client.");
+			return 0;
+		}
+
 		puts(data);
 		if (strcmp(data, "exit")==0) {
 			return 0;
