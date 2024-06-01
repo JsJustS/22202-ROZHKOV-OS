@@ -14,7 +14,7 @@ void main() {
 	char strpid[100];
 	sprintf(strpid, "%d\0", getpid());
 	char dsock_file_clt[512];
-    	snprintf(dsock_file_clt, sizeof(dsock_file_clt), "%s_%s", dsock_file, strpid);
+    	snprintf(dsock_file_clt, sizeof(dsock_file_clt), "%s_%s", dsock_file, strpid)	;
 
 	clt_sock = socket(AF_UNIX, SOCK_STREAM, 0);
 	if (clt_sock == -1) {
@@ -47,16 +47,24 @@ void main() {
 
 	char data[4096];
 	while (1) {
-		int ret;
-		fgets(data, 4096, stdin);
+		if (fgets(data, 4096, stdin) == NULL) {
+			perror("Could not read input data.");
+			exit(1);
+		}
+
 		data[strlen(data)-1] = '\0';
-		write(clt_sock, data, strlen(data));
-		ret = read(clt_sock, data, sizeof(data));
+		if (write(clt_sock, data, strlen(data)) < 1) {
+			perror("Could not write to the socket from client");
+			exit(1);
+		}
+
+		int ret = read(clt_sock, data, sizeof(data));
 		if (ret == -1) {
 			printf("Failed reading...\n");
 		} else {
-			printf("Message FROM server: \"%s\"\n", data);
+			printf("Message with %d bytes FROM server: \"%s\"\n", ret, data);
 		}
+
 		if (strcmp(data, "exit")==0) {
 			close(clt_sock);
 			exit(0);

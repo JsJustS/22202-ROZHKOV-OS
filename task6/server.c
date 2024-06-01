@@ -12,9 +12,6 @@ const int MAX_CLIENTS = 5;
 int serveClient(int clt_sock);
 
 void main() {
-	char x[100];
-	x[0] = '\0';
-	printf("hello: %d\n", strcmp(x, "hmmmm"));
 	int srv_sock;
 	int client_count = 0;
 	int clt_socks[MAX_CLIENTS];
@@ -61,7 +58,8 @@ void main() {
 
 	printf("Waiting for conections on \"%s\"\n", dsock_file);
 
-	while (1) {
+	int running = 1;
+	while (running) {
 		for (i = 0; i < MAX_CLIENTS; ++i) {
 			if (clt_socks[i] != -1) {
 				int status;
@@ -74,7 +72,11 @@ void main() {
 					clt_socks[i] = -1;
 					clt_pids[i] = -1;
 					client_count--;
-					printf("Client left: %d/%d. Status: %d\n", client_count, MAX_CLIENTS, WEXITSTATUS(res));
+					printf("Client left: %d/%d.\n", client_count, MAX_CLIENTS);
+					if (WEXITSTATUS(status) == 1) {
+						puts("Server closed...");
+						running = 0;
+					}
 				}
 			}
 		}
@@ -83,12 +85,16 @@ void main() {
 			sockaddr clt_sockaddr;
 			memset(&clt_sockaddr, 0, sizeof(sockaddr));
 			int clt_sock = accept4(srv_sock, (sockaddr*) &clt_sockaddr, &len, O_NONBLOCK);
+
+			// Не смогли установить новое соединение
 			if (clt_sock == -1) {
 				if (errno == EWOULDBLOCK) {
+					// Просто новых клиентов нет
         				puts("...");
         				sleep(1);
 					continue;
       				}
+				// Иначе произошла какая-то ошибка
 				perror("Could not accept client");
 				close(srv_sock);
 				for (i = 0; i < MAX_CLIENTS; ++i) {
@@ -100,7 +106,7 @@ void main() {
 				}
 				return;
 			}
-			
+			// Новый клиент подключился
 			client_count++;
 			printf("Client connected: %d/%d.\n", client_count, MAX_CLIENTS);
 			for (i = 0; i < MAX_CLIENTS; ++i) {
@@ -133,20 +139,25 @@ void main() {
 
 int serveClient(int clt_sock) {
 	char data[4096];
-	int ret;
 	while (1) {
+		int ret;
 		ret = read(clt_sock, data, sizeof(data));
-		//printf("[%d]", ret);
 		if (ret == -1) continue;
 		if (ret == 0) {
-			puts("damn");
+			printf("Client %d died.\n", getpid());
+			break;
 		}
 		data[ret] = '\0';
-		write(clt_sock, data, ret);
+		if (write(clt_sock, data, ret) < 1) {
+			perror("Could not write data to client.");
+			return 0;
+		}
+
 		puts(data);
 		if (strcmp(data, "exit")==0) {
-			puts("lol!");
 			return 0;
+		} else if (strcmp(data, "close")==0) {
+			return 1;
 		}
 	}
 	return -1;
