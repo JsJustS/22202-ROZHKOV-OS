@@ -53,13 +53,17 @@ void main() {
 
 int serveClient(int srv_sock) {
 	char data[4096];
-	int ret, len;
+	int ret, len = sizeof(sockaddr);
 	sockaddr clt_sockaddr;
 
 	ret = recvfrom(srv_sock, data, sizeof(data), 0, (sockaddr*) &clt_sockaddr, &len);
-	if (ret < 1) return 1;
+	if (ret < 1) return 1; // error on receive, try again
 	data[ret] = '\0';
-	sendto(srv_sock, data, sizeof(data), 0, (sockaddr*) &clt_sockaddr, len);
+
+	if (-1 == sendto(srv_sock, data, sizeof(data), 0, (sockaddr*) &clt_sockaddr, len)) {
+		perror("Could not send data to client");
+		return 0;
+	}
 	puts(data);
 
 	if (strcmp(data, "close")==0) return 0;

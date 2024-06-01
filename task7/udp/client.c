@@ -4,6 +4,7 @@
 #include <unistd.h>
 #include <netinet/in.h>
 #include <sys/wait.h>
+
 #define sockaddr struct sockaddr_in
 #define PORT 8888
 void main() {
@@ -27,13 +28,20 @@ void main() {
 		int ret, len;
 		fgets(data, 4096, stdin);
 		data[strlen(data)-1] = '\0';
-		sendto(clt_sock, data, sizeof(data), 0, (sockaddr*) &srv_sockaddr, sizeof(srv_sockaddr));
+
+		if (-1 == sendto(clt_sock, data, sizeof(data), 0, (sockaddr*) &srv_sockaddr, sizeof(srv_sockaddr))) {
+			perror("Could not send data to server");
+			close(clt_sock);
+			exit(0);
+		}
+
 		ret = recvfrom(clt_sock, data, sizeof(data), 0, (sockaddr*) &srv_sockaddr, &len);
 		if (ret == -1) {
 			printf("Failed reading...\n");
 		} else {
 			printf("Message FROM server: \"%s\"\n", data);
 		}
+		
 		if (strcmp(data, "exit")==0 || strcmp(data, "close")==0) {
 			close(clt_sock);
 			exit(0);
