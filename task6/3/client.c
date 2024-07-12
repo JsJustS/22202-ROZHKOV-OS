@@ -4,9 +4,22 @@
 #include <unistd.h>
 #include <sys/un.h>
 #include <sys/wait.h>
+
 #define sockaddr struct sockaddr_un
+#define BUFSIZE 4096
+
+void input(char *buf){
+    printf("> ");
+	int n = read(STDIN_FILENO, buf, BUFSIZE);
+    if (n == -1){
+        perror("Could not read input data.");
+        exit(1);
+    }
+	memset(buf, '\0', n);
+}
 
 void main() {
+	int err;
 	int clt_sock;
 	sockaddr clt_sockaddr, srv_sockaddr;
 
@@ -14,7 +27,7 @@ void main() {
 	char strpid[100];
 	sprintf(strpid, "%d\0", getpid());
 	char dsock_file_clt[512];
-    	snprintf(dsock_file_clt, sizeof(dsock_file_clt), "%s_%s", dsock_file, strpid)	;
+	snprintf(dsock_file_clt, sizeof(dsock_file_clt), "%s_%s", dsock_file, strpid);
 
 	clt_sock = socket(AF_UNIX, SOCK_STREAM, 0);
 	if (clt_sock == -1) {
@@ -26,8 +39,13 @@ void main() {
 	clt_sockaddr.sun_family = AF_UNIX;
 	strcpy(clt_sockaddr.sun_path, dsock_file_clt);
 
-	unlink(dsock_file_clt);
-	int err = bind(clt_sock, (sockaddr*) &clt_sockaddr, sizeof(clt_sockaddr));
+	err = unlink(dsock_file_clt);
+	if (err == -1) {
+		perror("Could not unlink socket");
+		exit(1);		
+	}
+
+	err = bind(clt_sock, (sockaddr*) &clt_sockaddr, sizeof(clt_sockaddr));
 	if (err == -1) {
 		perror("Bind fail");
 		close(clt_sock);
@@ -45,29 +63,35 @@ void main() {
 		exit(1);
 	}
 
-	char data[4096];
+	char data[BUFSIZE + 1];
+	int status_code;
 	while (1) {
-		if (fgets(data, 4096, stdin) == NULL) {
-			perror("Could not read input data.");
-			exit(1);
+		input(data);
+		if (strncmp(data, "exit", 4)==0) {
+			status_code = 0;
+			break;
 		}
 
-		data[strlen(data)-1] = '\0';
-		if (write(clt_sock, data, strlen(data)) < 1) {
-			perror("Could not write to the socket from client");
-			exit(1);
+		if (write(clt_sock, data, BUFSIZE) < 1) {
+			perror("Could not write to the socket from client.");
+			status_code = 1;
+			break;
 		}
 
 		int ret = read(clt_sock, data, sizeof(data));
 		if (ret == -1) {
-			printf("Failed reading...\n");
-		} else {
-			printf("Message with %d bytes FROM server: \"%s\"\n", ret, data);
+			perror("Could not read from the socket to client.");
+			status_code = 1;
+			break;
 		}
-
-		if (strcmp(data, "exit")==0) {
-			close(clt_sock);
-			exit(0);
+		if (ret == 0) {
+			printf("Server closed.\n");
+			status_code = 0;
+			break;
 		}
+		printf("< %s\n", data);
 	}
+
+	close(clt_sock);
+	exit(status_code);
 }
