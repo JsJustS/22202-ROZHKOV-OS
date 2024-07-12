@@ -21,7 +21,6 @@ void input(char *buf){
 }
 
 void main() {
-	signal(SIGPIPE, SIG_IGN);
 	int err;
 	int clt_sock;
 	sockaddr clt_sockaddr, srv_sockaddr;
