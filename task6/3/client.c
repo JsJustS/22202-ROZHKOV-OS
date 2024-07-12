@@ -16,8 +16,8 @@ void input(char *buf){
 		perror("Could not read input data.");
 		exit(1);
 	}
+	buf[n-1] = '\0';
 	printf("[%d]\n", n);
-	memset(buf, '\0', n);
 }
 
 void main() {
