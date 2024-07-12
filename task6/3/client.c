@@ -17,7 +17,6 @@ void input(char *buf){
 		exit(1);
 	}
 	buf[n-1] = '\0';
-	printf("[%d]\n", n);
 }
 
 void main() {
