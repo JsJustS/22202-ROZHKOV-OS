@@ -9,18 +9,17 @@
 
 #define sockaddr struct sockaddr_in
 #define PORT 8888
-const int MAX_CLIENTS = 5;
+#define BUFSIZE 4096
 
-int serveClient(int srv_sock);
+void serveClient(int srv_sock);
 
 void main() {
 	int srv_sock;
+	int clt_sock;
 	int i;
-
-	sockaddr srv_sockaddr;
-	int len = 0;
-	int val = 0;
 	int err;
+	sockaddr srv_sockaddr;
+	sockaddr clt_sockaddr;
 
 	// Init server
 	srv_sock = socket(AF_INET, SOCK_DGRAM, 0);
@@ -28,13 +27,14 @@ void main() {
 		perror("Failed on creating server socket");
 		return;
 	}
+
 	int option = 1;
 	setsockopt(srv_sock, SOL_SOCKET, SO_REUSEADDR, &option, sizeof(option));
 
 	memset(&srv_sockaddr, 0, sizeof(sockaddr));
 	srv_sockaddr.sin_family = AF_INET;
-    	srv_sockaddr.sin_addr.s_addr = htonl(INADDR_ANY);
-    	srv_sockaddr.sin_port = htons(PORT);
+	srv_sockaddr.sin_addr.s_addr = htonl(INADDR_ANY);
+	srv_sockaddr.sin_port = htons(PORT);
 
 	err = bind(srv_sock, (sockaddr*) &srv_sockaddr, sizeof(srv_sockaddr));
 	if (err == -1) {
@@ -45,30 +45,31 @@ void main() {
 
 	printf("Waiting for UDP clients on port %d\n", PORT);
 
-	int running = 1;
-	while (running) {
-		running = serveClient(srv_sock);
+	while (1) {
+		serveClient(srv_sock);
 	}
 }
 
-int serveClient(int srv_sock) {
-	char data[4096];
+void serveClient(int srv_sock) {
+	char data[BUFSIZE+1];
 	int ret, len = sizeof(sockaddr);
 	sockaddr clt_sockaddr;
 
 	ret = recvfrom(srv_sock, data, sizeof(data), 0, (sockaddr*) &clt_sockaddr, &len);
-	if (ret < 1) return 1; // error on receive, try again
+	if (ret == -1) {
+		perror("Could not read data from client.");
+		exit(1);
+	}
+	if (ret == 0) {
+		printf("Client closed.\n");
+		return;
+	}
 	data[ret] = '\0';
+	printf("> %s\n", data);
 
-	if (-1 == sendto(srv_sock, data, sizeof(data), 0, (sockaddr*) &clt_sockaddr, len)) {
+	if (sendto(srv_sock, data, sizeof(data), 0, (sockaddr*) &clt_sockaddr, len) < 0) {
 		perror("Could not send data to client");
-		return 0;
+		return;
 	}
-	puts(data);
-
-	if (strcmp(data, "close")==0) return 0;
-	if (strcmp(data, "exit")==0) {
-		puts("Client left");
-	}
-	return 1;
+	return;
 }
