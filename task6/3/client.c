@@ -39,6 +39,14 @@ void main() {
 	clt_sockaddr.sun_family = AF_UNIX;
 	strcpy(clt_sockaddr.sun_path, dsock_file_clt);
 
+	FILE* ptr;
+	ptr = fopen(dsock_file_clt, "w");
+	if (ptr == 0) {
+		perror("Could not create socket file.");
+		exit(1);
+	}
+	fclose(ptr);
+
 	err = unlink(dsock_file_clt);
 	if (err == -1) {
 		perror("Could not unlink socket");
