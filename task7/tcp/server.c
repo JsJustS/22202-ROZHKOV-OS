@@ -30,7 +30,12 @@ void main() {
 	}
 
 	int option = 1;
-	setsockopt(srv_sock, SOL_SOCKET, SO_REUSEADDR, &option, sizeof(option));
+	err = setsockopt(srv_sock, SOL_SOCKET, SO_REUSEADDR, &option, sizeof(option));
+	if (err == -1) {
+		perror("Could not set socket option");
+		close(srv_sock);
+		return;
+	}
 
 	memset(&srv_sockaddr, 0, sizeof(sockaddr));
 	srv_sockaddr.sin_family = AF_INET;
