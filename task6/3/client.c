@@ -9,16 +9,19 @@
 #define BUFSIZE 4096
 
 void input(char *buf){
-    printf("> ");
+	printf("> ");
+	fflush(stdout);
 	int n = read(STDIN_FILENO, buf, BUFSIZE);
-    if (n == -1){
-        perror("Could not read input data.");
-        exit(1);
-    }
+	if (n == -1){
+		perror("Could not read input data.");
+		exit(1);
+	}
+	printf("[%d]\n", n);
 	memset(buf, '\0', n);
 }
 
 void main() {
+	signal(SIGPIPE, SIG_IGN);
 	int err;
 	int clt_sock;
 	sockaddr clt_sockaddr, srv_sockaddr;
@@ -42,7 +45,7 @@ void main() {
 	FILE* ptr;
 	ptr = fopen(dsock_file_clt, "w");
 	if (ptr == 0) {
-		perror("Could not create socket file.");
+		perror("Could not create socket file");
 		exit(1);
 	}
 	fclose(ptr);
@@ -81,20 +84,15 @@ void main() {
 		}
 
 		if (write(clt_sock, data, BUFSIZE) < 1) {
-			perror("Could not write to the socket from client.");
+			perror("Could not write to the socket from client");
 			status_code = 1;
 			break;
 		}
 
 		int ret = read(clt_sock, data, sizeof(data));
 		if (ret == -1) {
-			perror("Could not read from the socket to client.");
+			perror("Could not read from the server socket");
 			status_code = 1;
-			break;
-		}
-		if (ret == 0) {
-			printf("Server closed.\n");
-			status_code = 0;
 			break;
 		}
 		printf("< %s\n", data);

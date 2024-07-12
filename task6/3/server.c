@@ -9,7 +9,6 @@
 
 #define sockaddr struct sockaddr_un
 #define BUFSIZE 4096
-#define MAX_CLIENTS 5
 
 int serveClient(int clt_sock);
 
@@ -50,7 +49,7 @@ void main() {
 		return;
 	}
 
-	err = listen(srv_sock, MAX_CLIENTS);
+	err = listen(srv_sock, 5);
 	if (err == -1) {
 		perror("Could not switch server socket to passive mode");
 		close(srv_sock);
@@ -68,7 +67,6 @@ void main() {
 			close(srv_sock);
 			return;
 		}
-		client_count++;
 
 		int pid = fork();
 		if (pid == -1) {
@@ -106,10 +104,6 @@ int serveClient(int clt_sock) {
 
 		data[BUFSIZE] = '\0';
 		printf("%d > %s\n", gettid(), data);
-		if (strcmp(data, "close")==0) {
-			status_code = 1;
-			break;
-		}
 
 		if (write(clt_sock, data, BUFSIZE) < 1) {
 			perror("Could not write data to client.");
