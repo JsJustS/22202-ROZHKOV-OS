@@ -97,13 +97,13 @@ int serveClient(int clt_sock) {
 			break;
 		}
 		if (ret == 0) {
-			printf("Client %d closed.\n", gettid());
+			printf("Client %d closed.\n", getpid());
 			status_code = 0;
 			break;
 		}
 
 		data[BUFSIZE] = '\0';
-		printf("%d > %s\n", gettid(), data);
+		printf("%d > %s\n", getpid(), data);
 
 		if (write(clt_sock, data, BUFSIZE) < 1) {
 			perror("Could not write data to client.");
