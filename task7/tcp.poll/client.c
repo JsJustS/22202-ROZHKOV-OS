@@ -4,9 +4,23 @@
 #include <unistd.h>
 #include <netinet/in.h>
 #include <sys/wait.h>
+
 #define sockaddr struct sockaddr_in
+#define BUFSIZE 4096
+
+void input(char *buf){
+	printf("> ");
+	fflush(stdout);
+	int n = read(STDIN_FILENO, buf, BUFSIZE);
+	if (n == -1){
+		perror("Could not read input data.");
+		exit(1);
+	}
+	buf[n-1] = '\0';
+}
 
 void main(int argc, char** argv) {
+	signal(SIGPIPE, SIG_IGN);
 	int PORT = 8888;
 	if (argc > 1) {
 		PORT = atoi(argv[1]);
@@ -24,7 +38,7 @@ void main(int argc, char** argv) {
 
 	srv_sockaddr.sin_family = AF_INET;
 	srv_sockaddr.sin_addr.s_addr = htonl(INADDR_ANY);
-    	srv_sockaddr.sin_port = htons(PORT);
+	srv_sockaddr.sin_port = htons(PORT);
 
 	int err = connect(clt_sock, (sockaddr*) &srv_sockaddr, sizeof(srv_sockaddr));
 	if (err == -1) {
@@ -33,21 +47,27 @@ void main(int argc, char** argv) {
 		exit(1);
 	}
 
-	char data[4096];
+	char data[BUFSIZE + 1];
+	int status_code;
 	while (1) {
-		int ret;
-		fgets(data, 4096, stdin);
-		data[strlen(data)-1] = '\0';
-		write(clt_sock, data, strlen(data));
-		ret = read(clt_sock, data, sizeof(data));
+		input(data);
+		if (strncmp(data, "exit", 4)==0) {
+			status_code = 0;
+			break;
+		}
+
+		if (write(clt_sock, data, BUFSIZE) < 1) {
+			perror("Could not write to the socket from client");
+			status_code = 1;
+			break;
+		}
+
+		int ret = read(clt_sock, data, sizeof(data));
 		if (ret == -1) {
-			printf("Failed reading...\n");
-		} else {
-			printf("Message FROM server: \"%s\"\n", data);
+			perror("Could not read from the server socket");
+			status_code = 1;
+			break;
 		}
-		if (strcmp(data, "exit")==0 || strcmp(data, "close")==0) {
-			close(clt_sock);
-			exit(0);
-		}
+		printf("< %s\n", data);
 	}
 }
